@@ -1,7 +1,6 @@
 package camp.cultr.darakserver.util.filter
 
-import camp.cultr.darakserver.service.UserDetailsServiceImpl
-import camp.cultr.darakserver.util.JwtUtil
+import camp.cultr.darakserver.component.JwtUtil
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletException
 import jakarta.servlet.http.HttpServletRequest

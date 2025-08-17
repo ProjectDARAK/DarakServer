@@ -80,6 +80,16 @@ class GlobalWebExceptionHandler: ResponseEntityExceptionHandler(), Logger {
         )
     }
 
+    /**
+     * Captures an exception and associates contextual information from the web request.
+     *
+     * This method utilizes the Sentry library to record the exception with additional hints for identifying
+     * the context in which it occurred. The request's context path is included in the captured data for
+     * enhanced traceability.
+     *
+     * @param exception The exception to be captured and sent to the Sentry monitoring system.
+     * @param request The WebRequest object providing contextual information related to the originating HTTP request.
+     */
     private fun captureException(
         exception: Exception,
         request: WebRequest) = Sentry.captureException(exception, Hint().apply {

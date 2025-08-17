@@ -4,6 +4,9 @@ import org.apache.commons.codec.binary.Base32
 import org.springframework.stereotype.Component
 import java.security.SecureRandom
 
+/**
+ * Component responsible for generating secure random tokens and initializing random byte arrays.
+ */
 @Component
 class Generator {
 

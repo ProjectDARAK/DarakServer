@@ -19,6 +19,26 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
+/**
+ * Security Configuration Class
+ *
+ * Configures Spring Security for the application, including authentication, authorization, and security filter chains.
+ * Provides beans for password encoding and authentication management, integrates custom JWT filters, and establishes
+ * security rules for HTTP requests.
+ *
+ * Dependencies:
+ * - UserDetailsService: Custom implementation for loading user-specific data.
+ * - AuthTokenFilter: JWT-based authentication filter.
+ * - AuthEntryPointJwt: Handles unauthorized access attempts.
+ *
+ * Configuration Highlights:
+ * - Disabling HTTP Basic and Form Login authentication methods.
+ * - CSRF protection is disabled.
+ * - Stateless session management.
+ * - Integration of custom authentication provider and JWT filter.
+ * - Authorization rules allowing all incoming requests by default.
+ * - Configurations for WebAuthn, setting the relying party name, domain, and allowed origins.
+ */
 @Configuration
 class SecurityConfig(
     private val userDetailsServiceImpl: UserDetailsService,
@@ -47,30 +67,20 @@ class SecurityConfig(
         http
             // HTTP 기본 인증 비활성화
             .httpBasic { it.disable() }
-            // 폼 로그인 비활성화
             .formLogin { it.disable() }
-            // CSRF 보호 비활성화 (REST API에서는 일반적으로 비활성화)
             .csrf { it.disable() }
-            // 인증되지 않은 요청에 대한 예외 처리
             .exceptionHandling { it.authenticationEntryPoint(unauthorizedHandler) }
-            // 세션 관리 정책 설정 (상태 비저장 - REST API에 적합)
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            // 인증 제공자 설정
             .authenticationProvider(authenticationProvider())
-            // JWT 토큰 필터 추가
             .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
-            // 프레임 옵션 비활성화 (X-Frame-Options 헤더)
             .headers { headersConfigurer -> headersConfigurer.frameOptions { it.disable() } }
-            // HTTP 요청 인가 규칙 설정
             .authorizeHttpRequests {
                 it.dispatcherTypeMatchers(DispatcherType.FORWARD)
                     .permitAll()
-                    // OPTIONS 메서드는 모든 경로에서 허용 (CORS 프리플라이트 요청용)
                     .requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
                     .requestMatchers("/**")
                     .permitAll()
-                // 그 외 모든 요청은 인증 필요
                 //                    .anyRequest()
                 //                    .authenticated()
             }

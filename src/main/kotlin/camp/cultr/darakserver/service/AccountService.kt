@@ -12,7 +12,7 @@ import camp.cultr.darakserver.component.Generator
 import camp.cultr.darakserver.domain.Account
 import camp.cultr.darakserver.domain.AccountGroupMember
 import camp.cultr.darakserver.dto.RegisterRequest
-import camp.cultr.darakserver.util.JwtUtil
+import camp.cultr.darakserver.component.JwtUtil
 import jakarta.transaction.Transactional
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder

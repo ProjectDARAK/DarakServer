@@ -11,6 +11,38 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 
+/**
+ * Component responsible for encrypting and decrypting strings using AES-GCM with a 256-bit key.
+ * This class is implemented as an `AttributeConverter` to handle the automatic conversion of attributes
+ * into encrypted data for storage in the database and back to plain text when retrieved.
+ *
+ * The encryption process uses AES-GCM (Galois/Counter Mode) for authenticated encryption, ensuring both
+ * data confidentiality and integrity. The encryption payload includes the initialization vector (IV),
+ * ciphertext, and authentication tag, all of which are Base64-encoded for storage purposes.
+ *
+ * Dependencies:
+ * - Requires a secure base AES-256 key, which is provided via the application configuration.
+ * - Utilizes the `Generator` component to create a secure random initialization vector (IV) for each encryption.
+ *
+ * Use Cases:
+ * - Can be applied to encrypt sensitive fields in entity classes, ensuring secure storage of data at rest.
+ *
+ * Behavior:
+ * - For encryption (`convertToDatabaseColumn`):
+ *   - Skips encryption for `null` or empty values.
+ *   - Generates a random IV of 12 bytes and uses AES-GCM to produce the ciphertext and tag.
+ *   - Combines the IV, ciphertext, and tag into a single payload and encodes it as a Base64 string.
+ * - For decryption (`convertToEntityAttribute`):
+ *   - Skips decryption for `null` or empty values.
+ *   - Decodes the Base64-encoded payload, extracts the IV, ciphertext, and tag.
+ *   - Uses AES-GCM to decrypt the data and return the original plain text.
+ *
+ * Security Considerations:
+ * - The AES key must be securely stored and properly configured in the application.
+ * - The key must be 256 bits (32 bytes) in size to meet AES-256 specifications.
+ * - Invalid payloads (e.g., incorrect size or altered data) will result in an exception, ensuring
+ *   that tampered data cannot be successfully decrypted.
+ */
 @Converter(autoApply = false)
 @Component
 class ColumnEncryptConverter(
@@ -25,6 +57,18 @@ class ColumnEncryptConverter(
         SecretKeySpec(keyBytes, AES)
     }
 
+    /**
+     * Converts the given attribute into a database-compatible encrypted string representation.
+     *
+     * This method encrypts a non-null, non-empty input string using AES-GCM encryption with a randomly
+     * generated IV and a predefined encryption key. The resulting encrypted data, along with the IV
+     * and authentication tag, is encoded into a Base64 string for storage compatibility in the database.
+     * If the input string is `null` or empty, it is returned as-is without encryption.
+     *
+     * @param attribute The input string to be encrypted. Can be null.
+     * @return A Base64-encoded, encrypted string representation of the input;
+     *         or the original input if it is null or empty.
+     */
     override fun convertToDatabaseColumn(attribute: String?): String? {
         if (attribute == null) return null
         if (attribute.isEmpty()) return attribute // 비어있는 문자열은 그대로 저장(정책에 따라 암호화해도 무방)
@@ -41,6 +85,17 @@ class ColumnEncryptConverter(
         return Base64.getEncoder().encodeToString(payload)
     }
 
+    /**
+     * Converts the provided database-compatible string into its decrypted plain text representation.
+     *
+     * This method decrypts a non-null, non-empty Base64-encoded string using AES-GCM decryption,
+     * with the IV and authentication tag extracted from the input. The decryption is performed using
+     * a predefined encryption key. If the input string is `null` or empty, it is returned as-is.
+     *
+     * @param dbData The input Base64-encoded string to be decrypted. Can be null.
+     * @return The decrypted plain text string, or the original input if it is null or empty.
+     * @throws IllegalArgumentException if the provided input does not meet the expected format for AES-GCM payloads.
+     */
     override fun convertToEntityAttribute(dbData: String?): String? {
         if (dbData == null) return null
         if (dbData.isEmpty()) return dbData

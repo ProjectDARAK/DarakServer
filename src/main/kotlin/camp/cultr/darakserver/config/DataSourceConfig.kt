@@ -16,6 +16,21 @@ import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean
 import javax.sql.DataSource
 
+/**
+ * Configuration class for managing database connections and JPA settings for the application.
+ *
+ * This class is responsible for setting up the primary data source, JPA repositories, and transaction
+ * management for the application using PostgreSQL as the database. It leverages HikariCP as the connection pool
+ * and configures properties retrieved from the `DarakDatabaseProperties` class.
+ *
+ * Features:
+ * - Configures primary data source properties using `DarakDatabaseProperties`.
+ * - Initializes the primary data source using HikariCP.
+ * - Configures a JPA `EntityManagerFactory` for database entity management.
+ * - Sets up a JPA `TransactionManager` for transaction handling.
+ * - Enables JPA repository support for specified base packages.
+ * - Enables JPA auditing to track changes in entity lifecycle (e.g., created and modified dates).
+ */
 @Configuration
 @EnableJpaRepositories(
     basePackages = ["camp.cultr.darakserver.repository"],
@@ -62,6 +77,23 @@ class DataSourceConfig {
     ) = JpaTransactionManager(localContainerEntityManagerFactoryBean.`object`!!)
 }
 
+/**
+ * Configuration properties for the Darak database.
+ *
+ * This class encapsulates the database connection settings used in the application.
+ * The properties defined here are typically configured in the application properties or YAML file
+ * under the `darak.database` namespace.
+ *
+ * Properties:
+ * - `url`: The hostname or IP address of the database server.
+ * - `username`: The username used to authenticate with the database.
+ * - `password`: The password used to authenticate with the database.
+ * - `port`: The port number on which the database server is listening.
+ * - `database`: The name of the database to connect to.
+ *
+ * These properties are primarily used in the DataSource configuration for establishing database connections,
+ * notably in the `DataSourceConfig` class.
+ */
 @ConfigurationProperties("darak.database")
 data class DarakDatabaseProperties(
     val url: String = "localhost",
