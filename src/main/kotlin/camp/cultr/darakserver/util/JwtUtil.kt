@@ -9,13 +9,13 @@ import java.util.Date
 
 
 @ConfigurationProperties(prefix = "darak")
-data class JwtProperties(val jwtSecret: String, val jwtExpirationInSeconds: Long, val domains: List<String>)
+data class JwtProperties(val jwtSecret: String, val jwtExpirationInSeconds: Long, val domain: String)
 
 @Component
 class JwtUtil(private val jwtProperties: JwtProperties) {
 
     private val key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.jwtSecret))
-    private val issuer = jwtProperties.domains[0]
+    private val issuer = jwtProperties.domain
     private val ttl = jwtProperties.jwtExpirationInSeconds
 
     fun createAccessToken(subject: String, roles: List<String>): String {
@@ -30,6 +30,14 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             .signWith(key)
             .compact()
     }
+
+    fun validate(token: String): Boolean =
+        try {
+            Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parseClaimsJws(token)
+            true
+        } catch (e: Exception) {
+            false
+        }
 
     /** 유효하면 Claims 반환, 아니면 예외 발생 */
     fun validateAndParse(token: String) =
