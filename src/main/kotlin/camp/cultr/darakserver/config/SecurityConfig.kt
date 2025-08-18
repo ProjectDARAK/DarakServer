@@ -79,10 +79,11 @@ class SecurityConfig(
                     .permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers("/**")
-                    .permitAll()
-                //                    .anyRequest()
-                //                    .authenticated()
+                    .requestMatchers("/auth/checkLoginType").permitAll()
+                    .requestMatchers("/auth/login/password").permitAll()
+                    .requestMatchers("/auth/login/otp").permitAll()
+                                    .anyRequest()
+                                    .authenticated()
             }
             .webAuthn{
                 it.rpName(instanceName)

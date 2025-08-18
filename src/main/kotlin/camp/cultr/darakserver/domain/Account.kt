@@ -58,6 +58,9 @@ data class Account(
     var otpEnabled: Boolean = false,
     @Column(name = "passkey_enabled", columnDefinition = "BOOLEAN DEFAULT false")
     var passkeyEnabled: Boolean = false,
+    @Convert(converter = ColumnEncryptConverter::class)
+    @Column(name = "security_recovery", columnDefinition = "TEXT")
+    var securityRecovery: String? = null,
     @CreatedDate var createdAt: ZonedDateTime? = null,
     @LastModifiedDate var updateAt: ZonedDateTime? = null,
     @OneToMany(mappedBy = "account") var groupMappings: MutableList<AccountGroupMember> = mutableListOf(),

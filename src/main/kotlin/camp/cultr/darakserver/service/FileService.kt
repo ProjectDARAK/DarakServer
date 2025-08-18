@@ -47,10 +47,10 @@ class FileException(message: String) : Exception(message)
 @Service
 class FileService(
     @Value("\${darak.base-directory}") private val baseDirectory: String,
-    private val accountUtil: AccountUtil,
-    private val passwordEncoder: PasswordEncoder,
     private val sharedFilesRepository: SharedFilesRepository,
     private val accountRepository: AccountRepository,
+    private val accountUtil: AccountUtil,
+    private val passwordEncoder: PasswordEncoder,
 ) : Logger {
     /**
      * Lists the contents of a user's personal directory.
@@ -211,6 +211,17 @@ class FileService(
         )
     }
 
+    /**
+     * Retrieves a list of shared files associated with a given share URI. If the shared files are
+     * password-protected, the correct password must be provided to access them.
+     *
+     * @param shareUri The unique identifier of the shared file resource.
+     * @param password The password to unlock access to the files, if required. Defaults to an empty string.
+     * @return A response object containing a list of file metadata wrapped in a CommonResponse object.
+     *         Each file metadata includes the filename, extension, whether it is a directory, and its size.
+     * @throws ResponseStatusException with NOT_FOUND status if the shared file resource is not found or inaccessible.
+     * @throws ResponseStatusException with UNAUTHORIZED status if the provided password is incorrect for password-protected files.
+     */
     fun listSharedFiles(shareUri: UUID, password: String = ""): CommonResponse<List<FileResponse>> {
         val sharedFiles = sharedFilesRepository.findById(shareUri).getOrNull()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
@@ -233,6 +244,13 @@ class FileService(
         )
     }
 
+    /**
+     * Retrieves a directly shared file associated with the provided share URI.
+     *
+     * @param shareUri The unique identifier of the shared file.
+     * @return A ResponseEntity containing the requested file as a FileSystemResource.
+     * @throws ResponseStatusException if the file is not found or the share type is not a direct link.
+     */
     fun getDirectSharedFile(shareUri: UUID): ResponseEntity<FileSystemResource> {
         val sharedFiles = sharedFilesRepository.findById(shareUri).getOrNull()
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
@@ -243,6 +261,13 @@ class FileService(
         return ResponseEntity.ok(FileSystemResource(file))
     }
 
+    /**
+     * Resolves and returns the target path based on the given relative path and optional user account.
+     *
+     * @param path The relative path for which the target path is to be determined. Can be blank.
+     * @param _user An optional user account to determine the base directory. If not provided, the current user is used.
+     * @return The resolved absolute target path, ensuring it is within the user's base directory. If necessary, directories will be created.
+     */
     private fun getTargetPath(path: String, _user: Account? = null): Path {
 
         val user = _user ?: accountUtil.getUserOrThrow()
