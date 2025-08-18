@@ -82,8 +82,8 @@ data class AccountGroup(
     var name: String,
     var description: String? = null,
     var enabled: Boolean = true,
-    @CreatedDate var createdAt: ZonedDateTime,
-    @LastModifiedDate var updateAt: ZonedDateTime,
+    @CreatedDate var createdAt: ZonedDateTime? = null,
+    @LastModifiedDate var updateAt: ZonedDateTime? = null,
     @OneToMany(mappedBy = "group") var memberMappings: MutableList<AccountGroupMember> = mutableListOf(),
 )
 

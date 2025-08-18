@@ -1,12 +1,21 @@
 spring:
   application:
     name: DarakServer
+  servlet:
+    multipart:
+      file-size-threshold: 10MB
+      location: /var/tmp/daraktemp-upload
   jpa:
     hibernate:
       dialect: org.hibernate.dialect.PostgreSQL10Dialect
       ddl-auto: update
     show-sql: false
     generate-ddl: true
+server:
+  tomcat:
+    max-swallow-size: -1
+    max-http-form-post-size: 0
+    connection-timeout: 600s
 
 management:
   endpoints:

@@ -39,3 +39,4 @@ out/
 ### Kotlin ###
 .kotlin
 buildenv.gradle.properties
+.DS_Store

@@ -2,7 +2,7 @@ darak:
   instance-name: DARAK_TEST
   domain: localhost
   jwt-secret: Y0ZhWVg4bllDa0VOQ2FIMzdRWHpCUFM2WHBHQ0p3bnFkc1JrTDU5VDdFOTJIOFhzWkc2NXFGd3VtaHZtN3dBZFBSSFpGbjhrUmZKeHpQNUhZWlFUTTNSMjN4VnU5ZlZLdEFnUm1VeUF6c1UzZXNnOHR3REhWS2VLYnNlN3VndG4=
-  jwt-expiration-in-seconds: 3600
+  jwt-expiration-in-seconds: 36000
   port: 8080
   database:
     url: "172.30.1.6"

@@ -4,6 +4,10 @@ import camp.cultr.darakserver.dto.CommonResponse
 import camp.cultr.darakserver.util.Logger
 import io.sentry.Hint
 import io.sentry.Sentry
+import io.sentry.SentryEvent
+import io.sentry.SentryLevel
+import io.sentry.protocol.Message
+import io.sentry.protocol.SentryException
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
@@ -43,12 +47,19 @@ class GlobalWebExceptionHandler: ResponseEntityExceptionHandler(), Logger {
         request: WebRequest
     ): ResponseEntity<CommonResponse<String>> {
         logger.error("handleResponseStatusException(request: ${request.contextPath}, status: ${exception.statusCode}, reason: ${exception.reason})")
-        val transactionId = captureException(exception, request)
+        val transactionId = Sentry.captureEvent(SentryEvent().apply {
+            throwable = exception
+            level = SentryLevel.INFO
+            logger = "GlobalWebExceptionHandler"
+            message = Message().apply {
+                message = "ResponseStatusException: ${exception.statusCode} - ${exception.reason}"
+            }
+        })
         return ResponseEntity(
             CommonResponse(
                 code = exception.statusCode.value(),
                 data = exception.reason ?: "HTTP STATUS: ${exception.statusCode.value()}",
-                transactionId = transactionId,
+                transactionId = transactionId.toString(),
             ),
             exception.statusCode,
         )

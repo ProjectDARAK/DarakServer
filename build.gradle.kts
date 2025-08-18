@@ -101,8 +101,6 @@ sentry {
 // 1) BuildConfig에 포함을 허용할 키만 화이트리스트
 val allowedKeys = setOf(
     "SENTRY_DSN",
-    // 필요 시 추가: "API_BASE_URL", "FEATURE_FLAG_X" 등
-    // 주의: 토큰/비밀번호/비밀키는 가급적 코드에 넣지 마세요.
 )
 
 // 2) 문자열 이스케이프 유틸

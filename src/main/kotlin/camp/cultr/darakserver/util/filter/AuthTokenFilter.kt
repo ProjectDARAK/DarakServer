@@ -1,6 +1,7 @@
 package camp.cultr.darakserver.util.filter
 
 import camp.cultr.darakserver.component.JwtUtil
+import io.jsonwebtoken.JwtException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletException
 import jakarta.servlet.http.HttpServletRequest
@@ -61,7 +62,8 @@ class AuthTokenFilter(private val jwtUtil: JwtUtil, @Lazy private val userDetail
             if (jwt != null && jwtUtil.validate(jwt)) {
                 // TODO: JWT DB Validation
                 // Extract username from the token
-                val username: String = jwtUtil.validateAndParse(jwt).id
+                val username: String = jwtUtil.validateAndParse(jwt).subject
+                myLogger.info("Validated JWT token for user: $username")
 
                 // Load user details from the database
                 val userDetails = userDetailsService.loadUserByUsername(username)
@@ -73,6 +75,8 @@ class AuthTokenFilter(private val jwtUtil: JwtUtil, @Lazy private val userDetail
                 // Set authentication in the security context
                 SecurityContextHolder.getContext().authentication = authentication
             }
+        } catch (ex: JwtException) {
+            myLogger.info("JWT token is invalid: ${ex.message}")
         } catch (e: Exception) {
             // Log if authentication information is missing or invalid
             myLogger.info("Missing authentication info")
@@ -95,7 +99,7 @@ class AuthTokenFilter(private val jwtUtil: JwtUtil, @Lazy private val userDetail
     private fun getJwt(request: HttpServletRequest): String? {
         val headerAuth =
             request.getHeader("Authorization") ?: String(Base64.getDecoder().decode(request.getParameter("token")))
-        logger.debug("parseJwt:auth:$headerAuth")
+        logger.info("parseJwt:auth:$headerAuth")
         return headerAuth.replace("Bearer ", "")
     }
 }

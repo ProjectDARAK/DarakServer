@@ -1,5 +1,6 @@
 package camp.cultr.darakserver.component
 
+import camp.cultr.darakserver.util.Logger
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.io.Decoders
 import io.jsonwebtoken.security.Keys
@@ -32,7 +33,7 @@ data class JwtProperties(val jwtSecret: String, val jwtExpirationInSeconds: Long
  *    expiration time, and issuer domain.
  */
 @Component
-class JwtUtil(private val jwtProperties: JwtProperties) {
+class JwtUtil(private val jwtProperties: JwtProperties): Logger {
 
     private val key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.jwtSecret))
     private val issuer = jwtProperties.domain
@@ -71,6 +72,7 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parseClaimsJws(token)
             true
         } catch (e: Exception) {
+            logger.error("Invalid JWT token: ${e.message}")
             false
         }
 
