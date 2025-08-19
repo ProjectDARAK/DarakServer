@@ -1,10 +1,9 @@
-package camp.cultr.darakserver.security
+package camp.cultr.darakserver.service
 
 import camp.cultr.darakserver.component.AccountUtil
 import camp.cultr.darakserver.component.TikaWrapper
 import camp.cultr.darakserver.repository.AccountRepository
 import camp.cultr.darakserver.repository.SharedFilesRepository
-import camp.cultr.darakserver.service.FileService
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir

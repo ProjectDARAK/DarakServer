@@ -1,4 +1,4 @@
-package camp.cultr.darakserver.security
+package camp.cultr.darakserver.util.filter
 
 import camp.cultr.darakserver.component.JwtUtil
 import camp.cultr.darakserver.util.filter.AuthTokenFilter

@@ -1,4 +1,4 @@
-package camp.cultr.darakserver.security
+package camp.cultr.darakserver.util.filter
 
 import camp.cultr.darakserver.component.JwtProperties
 import camp.cultr.darakserver.component.JwtUtil
@@ -17,6 +17,7 @@ import org.mockito.Mockito.mock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetailsService
+import java.util.Base64
 
 /**
  * Additional hardening tests for AuthTokenFilter around malformed/absent inputs.
@@ -73,7 +74,7 @@ class AuthTokenFilterHardeningTests {
 
         Mockito.`when`(request.getHeader("Authorization")).thenReturn(null)
         // Encodes just a raw jwt string which won't start with "Bearer "
-        Mockito.`when`(request.getParameter("token")).thenReturn(java.util.Base64.getEncoder().encodeToString("just-a-token".toByteArray()))
+        Mockito.`when`(request.getParameter("token")).thenReturn(Base64.getEncoder().encodeToString("just-a-token".toByteArray()))
 
         filter().doFilter(request, response, chain)
 

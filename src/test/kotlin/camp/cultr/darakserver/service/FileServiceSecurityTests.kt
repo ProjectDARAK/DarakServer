@@ -1,10 +1,9 @@
-package camp.cultr.darakserver.security
+package camp.cultr.darakserver.service
 
 import camp.cultr.darakserver.component.AccountUtil
 import camp.cultr.darakserver.component.TikaWrapper
 import camp.cultr.darakserver.repository.AccountRepository
 import camp.cultr.darakserver.repository.SharedFilesRepository
-import camp.cultr.darakserver.service.FileService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -14,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.nio.file.Files
 import java.nio.file.Path
@@ -85,8 +85,8 @@ class FileServiceSecurityTests {
         val resp = runCatching { service().downloadFile(link.fileName.toString()) }.exceptionOrNull()
         // downloadFile uses requireOrThrowResponseStatusException which throws ResponseStatusException
         // on forbidden symbolic links. We check that condition indirectly by seeing an exception thrown.
-        assertTrue(resp is org.springframework.web.server.ResponseStatusException)
-        if (resp is org.springframework.web.server.ResponseStatusException) {
+        assertTrue(resp is ResponseStatusException)
+        if (resp is ResponseStatusException) {
             assertEquals(HttpStatus.FORBIDDEN, resp.statusCode)
         }
     }
@@ -94,8 +94,8 @@ class FileServiceSecurityTests {
     @Test
     fun `downloadFile returns 404 for non-existent file`() {
         val resp = runCatching { service().downloadFile("nope.bin") }.exceptionOrNull()
-        assertTrue(resp is org.springframework.web.server.ResponseStatusException)
-        if (resp is org.springframework.web.server.ResponseStatusException) {
+        assertTrue(resp is ResponseStatusException)
+        if (resp is ResponseStatusException) {
             assertEquals(HttpStatus.NOT_FOUND, resp.statusCode)
         }
     }
