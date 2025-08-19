@@ -2,6 +2,7 @@ package camp.cultr.darakserver.config
 
 import camp.cultr.darakserver.util.Logger
 import camp.cultr.darakserver.util.errorhandler.AuthEntryPointJwt
+import camp.cultr.darakserver.util.filter.ApiKeyFilter
 import camp.cultr.darakserver.util.filter.AuthTokenFilter
 import jakarta.servlet.DispatcherType
 import org.springframework.beans.factory.annotation.Value
@@ -43,6 +44,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 class SecurityConfig(
     private val userDetailsServiceImpl: UserDetailsService,
     private val authTokenFilter: AuthTokenFilter,
+    private val apiKeyFilter: ApiKeyFilter,
     private val unauthorizedHandler: AuthEntryPointJwt,
     @Value("\${darak.instance-name}") private val instanceName: String,
     @Value("\${darak.domain}") private val domain: String,
@@ -72,7 +74,8 @@ class SecurityConfig(
             .exceptionHandling { it.authenticationEntryPoint(unauthorizedHandler) }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(authTokenFilter, ApiKeyFilter::class.java)
             .headers { headersConfigurer -> headersConfigurer.frameOptions { it.disable() } }
             .authorizeHttpRequests {
                 it.dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()

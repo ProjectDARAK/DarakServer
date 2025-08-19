@@ -14,3 +14,4 @@ darak:
   share-error-to-developer: true
   send-default-pii: false
   base-directory: ./darak-data
+  api-key: 0198bff7-c85b-74b1-946c-f92742011099
