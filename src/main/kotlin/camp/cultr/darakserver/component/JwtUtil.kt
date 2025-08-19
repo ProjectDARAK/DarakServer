@@ -1,6 +1,7 @@
 package camp.cultr.darakserver.component
 
 import camp.cultr.darakserver.util.Logger
+import io.jsonwebtoken.Jwe
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.io.Decoders
 import io.jsonwebtoken.security.Keys
@@ -33,7 +34,7 @@ data class JwtProperties(val jwtSecret: String, val jwtExpirationInSeconds: Long
  *    expiration time, and issuer domain.
  */
 @Component
-class JwtUtil(private val jwtProperties: JwtProperties): Logger {
+class JwtUtil(private val jwtProperties: JwtProperties) : Logger {
 
     private val key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.jwtSecret))
     private val issuer = jwtProperties.domain
@@ -69,7 +70,7 @@ class JwtUtil(private val jwtProperties: JwtProperties): Logger {
      */
     fun validate(token: String): Boolean =
         try {
-            Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parseClaimsJws(token)
+            Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parse(token)
             true
         } catch (e: Exception) {
             logger.error("Invalid JWT token: ${e.message}")
@@ -87,5 +88,5 @@ class JwtUtil(private val jwtProperties: JwtProperties): Logger {
      * @throws io.jsonwebtoken.JwtException If the token is invalid or cannot be parsed.
      */
     fun validateAndParse(token: String) =
-        Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parseClaimsJws(token).payload
+        Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parse(token).accept(Jwe.CLAIMS).payload
 }

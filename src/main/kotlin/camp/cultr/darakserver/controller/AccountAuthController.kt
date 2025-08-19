@@ -16,18 +16,18 @@ class AccountAuthController(
     private val accountAuthService: AccountAuthService,
 ) {
 
-    @GetMapping("/auth/checkLoginType")
+    @GetMapping("/checkLoginType")
     fun checkLoginType(@RequestParam username: String) = accountAuthService.checkLoginType(username)
 
-    @PostMapping("/auth/login/password")
+    @PostMapping("/login/password")
     fun passwordLogin(@RequestBody loginRequest: LoginRequest) = accountAuthService.passwordLogin(loginRequest)
 
-    @PostMapping("/auth/login/otp")
+    @PostMapping("/login/otp")
     fun otpLogin(@RequestBody loginRequest: LoginRequest) = accountAuthService.otpLogin(loginRequest)
 
-    @PostMapping("/auth/otp")
+    @PostMapping("/otp")
     fun requestOtpRegister() = accountAuthService.requestOtpRegister()
 
-    @PutMapping("/auth/otp")
+    @PutMapping("/otp")
     fun otpRegistrationVerify(@RequestParam otpCode: String) = accountAuthService.otpRegistrationVerify(otpCode)
 }

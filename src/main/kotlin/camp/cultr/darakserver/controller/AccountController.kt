@@ -2,6 +2,7 @@ package camp.cultr.darakserver.controller
 
 import camp.cultr.darakserver.dto.LoginRequest
 import camp.cultr.darakserver.dto.RegisterRequest
+import camp.cultr.darakserver.service.AccountAdminService
 import camp.cultr.darakserver.service.AccountAuthService
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -14,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/account")
 class AccountController(
-    private val accountAuthService: AccountAuthService,
+    private val accountAdminService: AccountAdminService
 ) {
 
     @PostMapping("/user")
-    fun registerUser(@RequestBody registerRequest: RegisterRequest) = accountAuthService.registerUser(registerRequest)
+    fun registerUser(@RequestBody registerRequest: RegisterRequest) = accountAdminService.registerUser(registerRequest)
 
 }

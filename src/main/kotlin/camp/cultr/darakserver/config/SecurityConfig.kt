@@ -75,15 +75,14 @@ class SecurityConfig(
             .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter::class.java)
             .headers { headersConfigurer -> headersConfigurer.frameOptions { it.disable() } }
             .authorizeHttpRequests {
-                it.dispatcherTypeMatchers(DispatcherType.FORWARD)
-                    .permitAll()
-                    .requestMatchers(HttpMethod.OPTIONS, "/**")
-                    .permitAll()
-                    .requestMatchers("/auth/checkLoginType").permitAll()
-                    .requestMatchers("/auth/login/password").permitAll()
-                    .requestMatchers("/auth/login/otp").permitAll()
-                                    .anyRequest()
-                                    .authenticated()
+                it.dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers("/api/account/auth/checkLoginType").permitAll()
+                    .requestMatchers("/api/account/auth/login/password").permitAll()
+                    .requestMatchers("/api/account/auth/login/otp").permitAll()
+                    .requestMatchers("/api/file/f/**").permitAll()
+                    .anyRequest()
+                    .authenticated()
             }
             .webAuthn{
                 it.rpName(instanceName)

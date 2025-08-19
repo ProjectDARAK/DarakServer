@@ -4,6 +4,7 @@ import camp.cultr.darakserver.domain.ShareType
 import java.util.UUID
 
 data class FileResponse(
+    val fileUUID: UUID,
     val filename: String,
     val extension: String,
     val isDirectory: Boolean,

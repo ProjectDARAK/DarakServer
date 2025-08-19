@@ -64,7 +64,20 @@ data class Account(
     @CreatedDate var createdAt: ZonedDateTime? = null,
     @LastModifiedDate var updateAt: ZonedDateTime? = null,
     @OneToMany(mappedBy = "account") var groupMappings: MutableList<AccountGroupMember> = mutableListOf(),
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Account
+
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}
 
 /**
  * Represents a group of accounts within the application.

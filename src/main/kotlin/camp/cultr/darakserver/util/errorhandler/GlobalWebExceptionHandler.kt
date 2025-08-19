@@ -2,12 +2,6 @@ package camp.cultr.darakserver.util.errorhandler
 
 import camp.cultr.darakserver.dto.CommonResponse
 import camp.cultr.darakserver.util.Logger
-import io.sentry.Hint
-import io.sentry.Sentry
-import io.sentry.SentryEvent
-import io.sentry.SentryLevel
-import io.sentry.protocol.Message
-import io.sentry.protocol.SentryException
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
@@ -15,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
+import java.util.UUID
 
 /**
  * Global exception handler for web applications.
@@ -47,19 +42,20 @@ class GlobalWebExceptionHandler: ResponseEntityExceptionHandler(), Logger {
         request: WebRequest
     ): ResponseEntity<CommonResponse<String>> {
         logger.error("handleResponseStatusException(request: ${request.contextPath}, status: ${exception.statusCode}, reason: ${exception.reason})")
-        val transactionId = Sentry.captureEvent(SentryEvent().apply {
-            throwable = exception
-            level = SentryLevel.INFO
-            logger = "GlobalWebExceptionHandler"
-            message = Message().apply {
-                message = "ResponseStatusException: ${exception.statusCode} - ${exception.reason}"
-            }
-        })
+//        val transactionId = Sentry.captureEvent(SentryEvent().apply {
+//            throwable = exception
+//            level = SentryLevel.INFO
+//            logger = "GlobalWebExceptionHandler"
+//            message = Message().apply {
+//                message = "ResponseStatusException: ${exception.statusCode} - ${exception.reason}"
+//            }
+//        })
         return ResponseEntity(
             CommonResponse(
                 code = exception.statusCode.value(),
                 data = exception.reason ?: "HTTP STATUS: ${exception.statusCode.value()}",
-                transactionId = transactionId.toString(),
+//                transactionId = transactionId.toString(),
+                transactionId = UUID.randomUUID().toString(),
             ),
             exception.statusCode,
         )
@@ -103,7 +99,12 @@ class GlobalWebExceptionHandler: ResponseEntityExceptionHandler(), Logger {
      */
     private fun captureException(
         exception: Exception,
-        request: WebRequest) = Sentry.captureException(exception, Hint().apply {
-            this["contextPath"] = request.contextPath
-    }).toString()
+        request: WebRequest): String {
+//        return Sentry.captureException(exception, Hint().apply {
+//            this["contextPath"] = request.contextPath
+//    }).toString()
+        val uuid = UUID.randomUUID().toString()
+        logger.error("[${uuid}]captureException(request: ${request.contextPath}, message: ${exception.message}) ", exception)
+        return uuid
+    }
 }

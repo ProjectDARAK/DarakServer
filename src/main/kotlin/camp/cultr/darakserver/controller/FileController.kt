@@ -41,6 +41,16 @@ class FileController(
     @GetMapping("/s/{shareUri}")
     fun listSharedFiles(@PathVariable shareUri: UUID, @RequestParam(required = false, defaultValue = "") password: String = "") = fileService.listSharedFiles(shareUri, password)
 
-    @GetMapping("/file/{shareUri}")
-    fun getDirectSharedFile(@PathVariable shareUri: UUID)
+    @GetMapping("/s/{shareUri}")
+    fun downloadSharedFile(
+        @PathVariable shareUri: UUID,
+        @RequestParam(required = true) fileUuids: List<UUID>,
+        @RequestParam(required = false, defaultValue = "") password: String = ""
+    ) = fileService.downloadSharedFile(shareUri, fileUuids, password)
+
+    @GetMapping("/d/{shareUri}")
+    fun getDirectSharedFile(@PathVariable shareUri: UUID) = fileService.getDirectSharedFile(shareUri)
+
+    @GetMapping("/f/{filePath}")
+    fun downloadFile(@PathVariable filePath: String) = fileService.downloadFileForUser(filePath)
 }

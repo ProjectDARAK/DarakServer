@@ -9,7 +9,8 @@ plugins {
     id("org.hibernate.orm") version "6.6.22.Final"
     id("org.graalvm.buildtools.native") version "0.10.6"
     kotlin("plugin.jpa") version "1.9.25"
-    id("io.sentry.jvm.gradle") version "5.9.0"
+    // Disable Sentry for now
+//    id("io.sentry.jvm.gradle") version "5.9.0"
 }
 
 group = "camp.cultr"
@@ -50,6 +51,7 @@ dependencies {
     implementation("dev.turingcomplete:kotlin-onetimepassword:2.4.1")
     implementation("com.webauthn4j:webauthn4j-core:0.29.5.RELEASE")
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    implementation("org.apache.tika:tika-core:3.2.2")
 //    Dev libs
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 //    Database
@@ -86,16 +88,16 @@ allOpen {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-sentry {
-    // Generates a JVM (Java, Kotlin, etc.) source bundle and uploads your source code to Sentry.
-    // This enables source context, allowing you to see your source
-    // code as part of your stack traces in Sentry.
-    includeSourceContext = true
-
-    org = "cultrcamp"
-    projectName = "darak-api-server"
-    authToken = project.extra["SENTRY_AUTH_TOKEN"] as String? ?: ""
-}
+//sentry {
+//    // Generates a JVM (Java, Kotlin, etc.) source bundle and uploads your source code to Sentry.
+//    // This enables source context, allowing you to see your source
+//    // code as part of your stack traces in Sentry.
+//    includeSourceContext = true
+//
+//    org = "cultrcamp"
+//    projectName = "darak-api-server"
+//    authToken = project.extra["SENTRY_AUTH_TOKEN"] as String? ?: ""
+//}
 
 
 // 1) BuildConfig에 포함을 허용할 키만 화이트리스트

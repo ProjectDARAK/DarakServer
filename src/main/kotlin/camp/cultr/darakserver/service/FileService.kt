@@ -1,6 +1,7 @@
 package camp.cultr.darakserver.service
 
 import camp.cultr.darakserver.component.AccountUtil
+import camp.cultr.darakserver.component.TikaWrapper
 import camp.cultr.darakserver.domain.Account
 import camp.cultr.darakserver.domain.ShareType
 import camp.cultr.darakserver.domain.SharedFiles
@@ -11,19 +12,29 @@ import camp.cultr.darakserver.dto.FileShareResponse
 import camp.cultr.darakserver.repository.AccountRepository
 import camp.cultr.darakserver.repository.SharedFilesRepository
 import camp.cultr.darakserver.util.Logger
+import camp.cultr.darakserver.util.filter.ResponseStatusExceptionParams
+import camp.cultr.darakserver.util.filter.requireOrThrowResponseStatusException
+import camp.cultr.darakserver.util.v5FromString
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.core.io.FileSystemResource
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.io.IOException
+import java.io.InputStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
@@ -34,6 +45,12 @@ import kotlin.io.path.isSymbolicLink
 import kotlin.io.path.listDirectoryEntries
 import kotlin.jvm.optionals.getOrNull
 
+/**
+ * Checks if the current path is a sub-path of the specified parent path.
+ *
+ * @param parent the parent path to check against
+ * @return true if the current path is a sub-path of the parent, false otherwise
+ */
 private fun java.nio.file.Path.isSubPathOf(parent: java.nio.file.Path): Boolean {
     return try {
         normalize().toAbsolutePath().startsWith(parent.normalize().toAbsolutePath())
@@ -42,6 +59,12 @@ private fun java.nio.file.Path.isSubPathOf(parent: java.nio.file.Path): Boolean 
     }
 }
 
+/**
+ * A specific type of exception that is thrown to indicate an error related to file operations.
+ *
+ * @constructor Creates a [FileException] with the specified error [message].
+ * @param message The detail message that provides information about the exception.
+ */
 class FileException(message: String) : Exception(message)
 
 @Service
@@ -51,6 +74,7 @@ class FileService(
     private val accountRepository: AccountRepository,
     private val accountUtil: AccountUtil,
     private val passwordEncoder: PasswordEncoder,
+    private val tikaWrapper: TikaWrapper
 ) : Logger {
     /**
      * Lists the contents of a user's personal directory.
@@ -68,6 +92,7 @@ class FileService(
         // List directory entries, exclude symbolic links, and map each entry to FileResponse containing filename, extension, directory flag and size
         data = getTargetPath(path).listDirectoryEntries().filter { !it.isSymbolicLink() }.map {
             FileResponse(
+                fileUUID = v5FromString(it.fileName.toString()),
                 filename = it.fileName.toString(),
                 extension = it.extension,
                 isDirectory = it.isDirectory(),
@@ -95,7 +120,8 @@ class FileService(
         }
         return CommonResponse(
             data = FileResponse(
-                filename = path,
+                fileUUID = v5FromString(targetDir.fileName.toString()),
+                filename = targetDir.fileName.toString(),
                 extension = "",
                 isDirectory = true,
                 size = 0
@@ -129,6 +155,7 @@ class FileService(
             }
             return CommonResponse(
                 data = FileResponse(
+                    fileUUID = v5FromString(filename),
                     filename = filename,
                     extension = targetFile.extension,
                     isDirectory = false,
@@ -160,6 +187,7 @@ class FileService(
             targetFile.toFile().deleteRecursively()
             return CommonResponse(
                 data = FileResponse(
+                    fileUUID = v5FromString(targetFile.fileName.toString()),
                     filename = targetFile.fileName.toString(),
                     extension = targetFile.extension,
                     isDirectory = targetFile.isDirectory(),
@@ -184,14 +212,14 @@ class FileService(
      */
     fun shareFile(request: FileShareRequest): CommonResponse<FileShareResponse> {
         val user = accountUtil.getUserOrThrow()
-        val paths = request.paths.map { getTargetPath(it, user) }
+        val paths = request.paths.map { getTargetPath(it, user).normalize() }.filter { it.exists() }.distinct()
         require(paths.all { it.exists() }) { "Invalid path included" }
         require(request.shareType == ShareType.INTERNAL && !request.sharedTo.isNullOrEmpty()) { "Internal share requires at least one sharedTo" }
         require(request.shareType == ShareType.DIRECT_LINK && request.password.isNullOrBlank()) { "Direct link share cannot include password" }
         require(request.shareType == ShareType.DIRECT_LINK && request.paths.size == 1) { "Direct link share can only be used for one file" }
         val sharedFiles = sharedFilesRepository.saveAndFlush(
             SharedFiles(
-                files = request.paths.map { Path(user.username, it).toString() }.toMutableList(),
+                files = paths.map { it.toString() }.toMutableList(),
                 shareType = request.shareType,
                 password = if (request.shareType == ShareType.WEBSITE && !request.password.isNullOrBlank()) passwordEncoder.encode(
                     request.password
@@ -235,6 +263,7 @@ class FileService(
             data = sharedFiles.files.map {
                 val path = Path(it)
                 FileResponse(
+                    fileUUID = v5FromString(path.fileName.toString()),
                     filename = path.fileName.toString(),
                     extension = path.extension,
                     isDirectory = path.isDirectory(),
@@ -245,20 +274,227 @@ class FileService(
     }
 
     /**
+     * Downloads a shared file based on the given share URI and file UUIDs. Handles different share types
+     * (INTERNAL, DIRECT_LINK, WEBSITE) and validates user authorization or password as necessary.
+     *
+     * @param shareUri The unique identifier of the share containing the files to download.
+     * @param fileUuids A list of unique identifiers for the files to be downloaded within the shared URI.
+     * @param password The password required to access shared files if the share type is PASSWORD-PROTECTED (default is an empty string).
+     * @return A ResponseEntity containing a StreamingResponseBody for the requested file download.
+     * @throws ResponseStatusException If the share or specific file UUIDs are not found, user lacks access, or password is invalid.
+     */
+    fun downloadSharedFile(
+        shareUri: UUID,
+        fileUuids: List<UUID>,
+        password: String = ""
+    ): ResponseEntity<StreamingResponseBody> {
+        val sharedFiles = sharedFilesRepository.findById(shareUri).getOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
+        val allFiles = sharedFiles.files.associate {
+            val path = Path(it)
+            v5FromString(path.fileName.toString()) to path
+        }
+        requireOrThrowResponseStatusException(fileUuids.all { allFiles.contains(it) }) {
+            ResponseStatusExceptionParams(
+                HttpStatus.NOT_FOUND,
+                "fileUUID is not included in the shared file: $shareUri."
+            )
+        }
+        when (sharedFiles.shareType) {
+            ShareType.INTERNAL -> {
+                if (sharedFiles.sharedTo.contains(accountUtil.getUserOrThrow())) {
+                    return makeSharedFilesDownloadable(allFiles, fileUuids)
+                } else {
+                    throw ResponseStatusException(HttpStatus.FORBIDDEN, "You don't have access to this file")
+                }
+            }
+
+            ShareType.DIRECT_LINK -> {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found")
+            }
+
+            ShareType.WEBSITE -> {
+                if (sharedFiles.password != null && !passwordEncoder.matches(password, sharedFiles.password)) {
+                    throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid password")
+                }
+                return makeSharedFilesDownloadable(allFiles, fileUuids)
+            }
+        }
+    }
+
+    /**
+     * Prepares shared files for download. If only one file is requested, it handles downloading
+     * the file directly. If multiple files are requested, it packages them into a zip before
+     * making them downloadable.
+     *
+     * @param allFiles a map where the key is the UUID of the file and the value is its corresponding path
+     * @param downloadFileUuids a list of UUIDs representing the files to be downloaded
+     * @return ResponseEntity containing a StreamingResponseBody for the requested download
+     */
+    private fun makeSharedFilesDownloadable(
+        allFiles: Map<UUID, Path>,
+        downloadFileUuids: List<UUID>
+    ): ResponseEntity<StreamingResponseBody> =
+        if (downloadFileUuids.size == 1) downloadFile(allFiles[downloadFileUuids.first()]!!)
+        else downloadFileZip(downloadFileUuids.map { allFiles[it]!! })
+
+    /**
      * Retrieves a directly shared file associated with the provided share URI.
      *
      * @param shareUri The unique identifier of the shared file.
      * @return A ResponseEntity containing the requested file as a FileSystemResource.
      * @throws ResponseStatusException if the file is not found or the share type is not a direct link.
      */
-    fun getDirectSharedFile(shareUri: UUID): ResponseEntity<FileSystemResource> {
+    fun getDirectSharedFile(shareUri: UUID): ResponseEntity<StreamingResponseBody> {
         val sharedFiles = sharedFilesRepository.findById(shareUri).getOrNull()
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
         if (sharedFiles.shareType != ShareType.DIRECT_LINK) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found")
         }
         val file = Path(sharedFiles.files.first(), sharedFiles.sharedBy.username)
-        return ResponseEntity.ok(FileSystemResource(file))
+        return downloadFile(file.toString())
+    }
+
+    /**
+     * Downloads a file for the user from the specified path.
+     *
+     * @param path The file path for the file to be downloaded.
+     * @return A ResponseEntity containing a StreamingResponseBody for the file download.
+     */
+    fun downloadFileForUser(path: String): ResponseEntity<StreamingResponseBody> = downloadFile(getTargetPath(path))
+
+    /**
+     * Downloads a file from the specified path.
+     * Alias for [downloadFile(String)]
+     *
+     * @param file the path of the file to be downloaded
+     * @see downloadFile(String)
+     */
+    private fun downloadFile(file: Path) = downloadFile(file.toString())
+
+    /**
+     * Downloads a file from the specified file path and returns it as a response entity.
+     *
+     * Validates that the requested file path is within the allowed base directory to prevent unauthorized access.
+     * Streams the file content directly to the client to handle large files efficiently.
+     *
+     * @param filePath The path of the file to be downloaded. The path must be relative to the configured base directory.
+     * @return A ResponseEntity object containing the file as a streaming response body, along with proper headers such as content disposition and content type.
+     * Throws IllegalArgumentException if the requested path is outside of the base directory.
+     */
+    private fun downloadFile(filePath: String): ResponseEntity<StreamingResponseBody> {
+        val requestedPath = Path(filePath.substringAfterLast('/')).normalize()
+        val basePath = Path(baseDirectory).normalize()
+        val normalizedPath = basePath.resolve(requestedPath).normalize()
+
+        requireOrThrowResponseStatusException(normalizedPath.isSubPathOf(basePath)) {
+            ResponseStatusExceptionParams(
+                HttpStatus.FORBIDDEN,
+                "File path is outside of the base directory"
+            )
+        }
+        requireOrThrowResponseStatusException(!normalizedPath.isSymbolicLink()) {
+            ResponseStatusExceptionParams(
+                HttpStatus.FORBIDDEN,
+                "Symbolic link detected"
+            )
+        }
+        requireOrThrowResponseStatusException(normalizedPath.exists()) {
+            ResponseStatusExceptionParams(
+                HttpStatus.NOT_FOUND,
+                "File not found: $filePath"
+            )
+        }
+
+        val body = StreamingResponseBody { output ->
+            Files.newInputStream(normalizedPath).use { input: InputStream ->
+                input.copyTo(output, 1024 * 64) // 64KB 버퍼
+            }
+        }
+
+        val cd = ContentDisposition.attachment()
+            .filename(normalizedPath.fileName.toString(), StandardCharsets.UTF_8)
+            .build()
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
+            .contentType(MediaType.valueOf(tikaWrapper.getMimeType(normalizedPath)))
+            .contentLength(normalizedPath.fileSize())
+            .body(body)
+    }
+
+    /**
+     * Downloads a ZIP file containing the specified file paths.
+     * Alias for [downloadFileZip(List<String>)]
+     *
+     * @param filePaths A list of file paths that need to be included in the ZIP file.
+     * @see downloadFileZip(List<String>)
+     */
+    private fun downloadFileZip(filePaths: List<Path>) = downloadFileZip(filePaths.map { it.toString() })
+
+    /**
+     * Creates a downloadable ZIP file containing the specified files from the server's directory.
+     *
+     * @param filePaths A list of file paths relative to the base directory that need to be included in the ZIP file.
+     * @return A ResponseEntity containing a StreamingResponseBody which streams the ZIP file to the client.
+     *         The response includes appropriate headers indicating that it is a file attachment.
+     */
+    private fun downloadFileZip(filePaths: List<String>): ResponseEntity<StreamingResponseBody> {
+        val requestedPaths = filePaths.map { Path(it.substringAfterLast('/')).normalize() }
+        val basePath = Path(baseDirectory).normalize()
+        val normalizedPaths = requestedPaths.map { basePath.resolve(it).normalize() }
+
+        requireOrThrowResponseStatusException(normalizedPaths.all { it.isSubPathOf(basePath) }) {
+            ResponseStatusExceptionParams(HttpStatus.FORBIDDEN, "File path is outside of the base directory")
+        }
+        requireOrThrowResponseStatusException(normalizedPaths.none { it.isSymbolicLink() }) {
+            ResponseStatusExceptionParams(HttpStatus.FORBIDDEN, "Symbolic link detected")
+        }
+        requireOrThrowResponseStatusException(normalizedPaths.all { it.exists() }) {
+            ResponseStatusExceptionParams(HttpStatus.NOT_FOUND, "Some files not found")
+        }
+
+        val body = StreamingResponseBody { output ->
+            ZipOutputStream(output).use { zipOut ->
+                normalizedPaths.forEach { path ->
+                    addToZip(zipOut, path, basePath)
+                }
+            }
+        }
+
+        val cd = ContentDisposition.attachment()
+            .filename("archive.zip", StandardCharsets.UTF_8)
+            .build()
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, cd.toString())
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(body)
+    }
+
+    /**
+     * Adds files or directories to a ZIP output stream.
+     *
+     * @param zipOut The ZipOutputStream where files or directories will be added.
+     * @param path The Path of the file or directory to be added to the ZIP.
+     * @param basePath The base Path to calculate relative paths for entries within the ZIP.
+     */
+    private fun addToZip(zipOut: ZipOutputStream, path: Path, basePath: Path) {
+        if (path.isDirectory()) {
+            Files.walk(path)
+                .filter { !it.isDirectory() }
+                .forEach { file ->
+                    val entryName = basePath.relativize(file).toString()
+                    zipOut.putNextEntry(ZipEntry(entryName))
+                    Files.copy(file, zipOut)
+                    zipOut.closeEntry()
+                }
+        } else {
+            val entryName = basePath.relativize(path).toString()
+            zipOut.putNextEntry(ZipEntry(entryName))
+            Files.copy(path, zipOut)
+            zipOut.closeEntry()
+        }
     }
 
     /**
@@ -269,7 +505,7 @@ class FileService(
      * @return The resolved absolute target path, ensuring it is within the user's base directory. If necessary, directories will be created.
      */
     private fun getTargetPath(path: String, _user: Account? = null): Path {
-
+        checkFilePath(path)
         val user = _user ?: accountUtil.getUserOrThrow()
         val baseDir = Path(baseDirectory, user.username)
         if (!baseDir.exists()) {
@@ -287,4 +523,8 @@ class FileService(
             }
         }
     }
+
+    fun checkFilePath(path: String) = requireOrThrowResponseStatusException(
+        path.contains("..") || path.contains(baseDirectory) || path.startsWith("/"),
+    ) { ResponseStatusExceptionParams(HttpStatus.BAD_REQUEST, "Invalid path") }
 }
