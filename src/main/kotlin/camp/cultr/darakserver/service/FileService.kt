@@ -88,9 +88,8 @@ class FileService(
      * @param path A relative path within the user's base directory. Defaults to an empty string, indicating the base directory itself.
      * @return A `CommonResponse` wrapping a list of `FileResponse` objects representing the directory's contents.
      */
-    fun listPersonalDirectory(path: String = ""): CommonResponse<List<FileResponse>> = CommonResponse(
-        // List directory entries, exclude symbolic links, and map each entry to FileResponse containing filename, extension, directory flag and size
-        data = getTargetPath(path).listDirectoryEntries().filter { !it.isSymbolicLink() }.map {
+    fun listPersonalDirectory(path: String = ""): List<FileResponse> =
+        getTargetPath(path).listDirectoryEntries().filter { !it.isSymbolicLink() }.map {
             FileResponse(
                 fileUUID = v5FromString(it.fileName.toString()),
                 filename = it.fileName.toString(),
@@ -99,7 +98,6 @@ class FileService(
                 size = it.fileSize()
             )
         }
-    )
 
     /**
      * Creates a directory at the specified path.
@@ -113,19 +111,17 @@ class FileService(
      *         including the directory name, extension (empty for directories), a flag indicating
      *         it is a directory, and its size (defaulted to 0 for new directories).
      */
-    fun mkdir(path: String): CommonResponse<FileResponse> {
+    fun mkdir(path: String): FileResponse {
         val targetDir = getTargetPath(path)
         if (!targetDir.exists()) {
             targetDir.toFile().mkdirs()
         }
-        return CommonResponse(
-            data = FileResponse(
-                fileUUID = v5FromString(targetDir.fileName.toString()),
-                filename = targetDir.fileName.toString(),
-                extension = "",
-                isDirectory = true,
-                size = 0
-            )
+        return FileResponse(
+            fileUUID = v5FromString(targetDir.fileName.toString()),
+            filename = targetDir.fileName.toString(),
+            extension = "",
+            isDirectory = true,
+            size = 0
         )
     }
 
@@ -143,7 +139,7 @@ class FileService(
      * @return A `CommonResponse` containing a `FileResponse` with details about the saved file,
      *         including filename, extension, file size, and an indicator that it is not a directory.
      */
-    fun saveFile(path: String, file: MultipartFile): CommonResponse<FileResponse> {
+    fun saveFile(path: String, file: MultipartFile): FileResponse {
         val targetDir = getTargetPath(path)
         val filename = file.originalFilename?.substringAfterLast('/')?.substringAfterLast('\\')
             ?: throw FileException("File name is null")
@@ -153,14 +149,12 @@ class FileService(
             file.inputStream.use { inputStream ->
                 Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING)
             }
-            return CommonResponse(
-                data = FileResponse(
-                    fileUUID = v5FromString(filename),
-                    filename = filename,
-                    extension = targetFile.extension,
-                    isDirectory = false,
-                    size = targetFile.fileSize()
-                )
+            return FileResponse(
+                fileUUID = v5FromString(filename),
+                filename = filename,
+                extension = targetFile.extension,
+                isDirectory = false,
+                size = targetFile.fileSize()
             )
         } catch (e: IOException) {
             logger.error("Failed to save file(${targetFile.absolutePathString()}: ${e.message}")
@@ -181,18 +175,16 @@ class FileService(
      *         and its size before deletion.
      * @throws FileException If the file or directory does not exist.
      */
-    fun deleteFile(path: String): CommonResponse<FileResponse> {
+    fun deleteFile(path: String): FileResponse {
         val targetFile = getTargetPath(path)
         if (targetFile.exists()) {
             targetFile.toFile().deleteRecursively()
-            return CommonResponse(
-                data = FileResponse(
-                    fileUUID = v5FromString(targetFile.fileName.toString()),
-                    filename = targetFile.fileName.toString(),
-                    extension = targetFile.extension,
-                    isDirectory = targetFile.isDirectory(),
-                    size = targetFile.fileSize()
-                )
+            return FileResponse(
+                fileUUID = v5FromString(targetFile.fileName.toString()),
+                filename = targetFile.fileName.toString(),
+                extension = targetFile.extension,
+                isDirectory = targetFile.isDirectory(),
+                size = targetFile.fileSize()
             )
         } else {
             throw FileException("File not found: $path")
@@ -210,7 +202,7 @@ class FileService(
      * @param request The file sharing request containing paths, share type, shared accounts, and optional password.
      * @return A response containing the sharing URI wrapped in a common response object.
      */
-    fun shareFile(request: FileShareRequest): CommonResponse<FileShareResponse> {
+    fun shareFile(request: FileShareRequest): FileShareResponse {
         val user = accountUtil.getUserOrThrow()
         val paths = request.paths.map { getTargetPath(it, user).normalize() }.filter { it.exists() }.distinct()
         require(paths.all { it.exists() }) { "Invalid path included" }
@@ -232,10 +224,8 @@ class FileService(
                 }.toMutableList() else mutableListOf(),
             )
         )
-        return CommonResponse(
-            data = FileShareResponse(
-                shareUri = sharedFiles.id
-            )
+        return FileShareResponse(
+            shareUri = sharedFiles.id
         )
     }
 
@@ -250,7 +240,7 @@ class FileService(
      * @throws ResponseStatusException with NOT_FOUND status if the shared file resource is not found or inaccessible.
      * @throws ResponseStatusException with UNAUTHORIZED status if the provided password is incorrect for password-protected files.
      */
-    fun listSharedFiles(shareUri: UUID, password: String = ""): CommonResponse<List<FileResponse>> {
+    fun listSharedFiles(shareUri: UUID, password: String = ""): List<FileResponse> {
         val sharedFiles = sharedFilesRepository.findById(shareUri).getOrNull()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found: $shareUri")
         if (sharedFiles.shareType == ShareType.DIRECT_LINK) {
@@ -259,18 +249,16 @@ class FileService(
         if (sharedFiles.password != null && !passwordEncoder.matches(password, sharedFiles.password)) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid password")
         }
-        return CommonResponse(
-            data = sharedFiles.files.map {
-                val path = Path(it)
-                FileResponse(
-                    fileUUID = v5FromString(path.fileName.toString()),
-                    filename = path.fileName.toString(),
-                    extension = path.extension,
-                    isDirectory = path.isDirectory(),
-                    size = path.fileSize()
-                )
-            }
-        )
+        return sharedFiles.files.map {
+            val path = Path(it)
+            FileResponse(
+                fileUUID = v5FromString(path.fileName.toString()),
+                filename = path.fileName.toString(),
+                extension = path.extension,
+                isDirectory = path.isDirectory(),
+                size = path.fileSize()
+            )
+        }
     }
 
     /**
@@ -424,23 +412,14 @@ class FileService(
     }
 
     /**
-     * Downloads a ZIP file containing the specified file paths.
-     * Alias for [downloadFileZip(List<String>)]
-     *
-     * @param filePaths A list of file paths that need to be included in the ZIP file.
-     * @see downloadFileZip(List<String>)
-     */
-    private fun downloadFileZip(filePaths: List<Path>) = downloadFileZip(filePaths.map { it.toString() })
-
-    /**
      * Creates a downloadable ZIP file containing the specified files from the server's directory.
      *
      * @param filePaths A list of file paths relative to the base directory that need to be included in the ZIP file.
      * @return A ResponseEntity containing a StreamingResponseBody which streams the ZIP file to the client.
      *         The response includes appropriate headers indicating that it is a file attachment.
      */
-    private fun downloadFileZip(filePaths: List<String>): ResponseEntity<StreamingResponseBody> {
-        val requestedPaths = filePaths.map { Path(it.substringAfterLast('/')).normalize() }
+    private fun downloadFileZip(filePaths: List<Path>): ResponseEntity<StreamingResponseBody> {
+        val requestedPaths = filePaths.map { it.normalize() }
         val basePath = Path(baseDirectory).normalize()
         val normalizedPaths = requestedPaths.map { basePath.resolve(it).normalize() }
 
@@ -524,7 +503,12 @@ class FileService(
         }
     }
 
+    /**
+     * Validates a file path to ensure that it does not contain invalid patterns or locations.
+     *
+     * @param path the file path to be validated
+     */
     fun checkFilePath(path: String) = requireOrThrowResponseStatusException(
-        path.contains("..") || path.contains(baseDirectory) || path.startsWith("/"),
+        !(path.contains("..") || path.contains(baseDirectory) || path.startsWith("/")),
     ) { ResponseStatusExceptionParams(HttpStatus.BAD_REQUEST, "Invalid path") }
 }

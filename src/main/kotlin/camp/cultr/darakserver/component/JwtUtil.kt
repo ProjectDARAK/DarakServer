@@ -88,5 +88,5 @@ class JwtUtil(private val jwtProperties: JwtProperties) : Logger {
      * @throws io.jsonwebtoken.JwtException If the token is invalid or cannot be parsed.
      */
     fun validateAndParse(token: String) =
-        Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parse(token).accept(Jwe.CLAIMS).payload
+        Jwts.parser().verifyWith(key).requireIssuer(issuer).build().parseSignedClaims(token).payload
 }

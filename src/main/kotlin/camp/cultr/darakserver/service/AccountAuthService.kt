@@ -1,7 +1,6 @@
 package camp.cultr.darakserver.service
 
 import camp.cultr.darakserver.dto.AuthType
-import camp.cultr.darakserver.dto.CommonResponse
 import camp.cultr.darakserver.dto.JwtResponse
 import camp.cultr.darakserver.dto.LoginRequest
 import camp.cultr.darakserver.repository.AccountGroupMemberRepository
@@ -9,9 +8,6 @@ import camp.cultr.darakserver.repository.AccountGroupRepository
 import camp.cultr.darakserver.repository.AccountRepository
 import camp.cultr.darakserver.component.AccountUtil
 import camp.cultr.darakserver.component.Generator
-import camp.cultr.darakserver.domain.Account
-import camp.cultr.darakserver.domain.AccountGroupMember
-import camp.cultr.darakserver.dto.RegisterRequest
 import camp.cultr.darakserver.component.JwtUtil
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
@@ -19,7 +15,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import kotlin.jvm.optionals.getOrNull
 
 @Service
 class AccountAuthService(
@@ -43,20 +38,18 @@ class AccountAuthService(
      * @return A `CommonResponse` containing the determined `AuthType` for the user's login.
      * @throws ResponseStatusException If the user is not found in the repository.
      */
-    fun checkLoginType(username: String): CommonResponse<AuthType> {
+    fun checkLoginType(username: String): AuthType {
         val user = accountRepository.findByUsername(username) ?: throw ResponseStatusException(
             HttpStatus.NOT_FOUND,
             "User not found"
         )
-        return CommonResponse(
-            data = if (user.otpEnabled) {
-                AuthType.OTP
-            } else if (user.passkeyEnabled) {
-                AuthType.PASSKEY
-            } else {
-                AuthType.PASSWORD
-            }
-        )
+        return if (user.otpEnabled) {
+            AuthType.OTP
+        } else if (user.passkeyEnabled) {
+            AuthType.PASSKEY
+        } else {
+            AuthType.PASSWORD
+        }
     }
 
     /**
@@ -70,17 +63,15 @@ class AccountAuthService(
      * @return A `CommonResponse` containing a `JwtResponse` with the generated JWT access token if authentication succeeds.
      * @throws ResponseStatusException If the user is not found, the password is incorrect, or OTP login is enabled for the user.
      */
-    fun passwordLogin(loginRequest: LoginRequest): CommonResponse<JwtResponse> {
+    fun passwordLogin(loginRequest: LoginRequest): JwtResponse {
         val user = accountRepository.findByUsername(loginRequest.username)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
         if (user.otpEnabled) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "OTP login enabled")
         }
         if (passwordEncoder.matches(loginRequest.password, user.password)) {
-            return CommonResponse(
-                data = JwtResponse(
-                    jwtUtil.createAccessToken(user.id.toString(), emptyList()),
-                )
+            return JwtResponse(
+                jwtUtil.createAccessToken(user.id.toString(), emptyList()),
             )
         } else {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
@@ -97,10 +88,10 @@ class AccountAuthService(
      * @throws ResponseStatusException with HttpStatus.BAD_REQUEST if OTP login is disabled for the user.
      */
     @Transactional
-    fun otpLogin(loginRequest: LoginRequest): CommonResponse<JwtResponse> {
+    fun otpLogin(loginRequest: LoginRequest): JwtResponse {
         val user = accountRepository.findByUsername(loginRequest.username)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
-        if(!user.otpEnabled) {
+        if (!user.otpEnabled) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP login disabled")
         }
         val otpValid = otpService.validate(user.otpSecret!!.toByteArray(), loginRequest.password)
@@ -108,14 +99,12 @@ class AccountAuthService(
         val securityRecovery = objectMapper.readValue(user.securityRecovery, ArrayList::class.java)
         val securityRecoveryValid = securityRecovery.contains(loginRequest.password)
         if (otpValid || securityRecoveryValid) {
-            if(securityRecoveryValid) {
+            if (securityRecoveryValid) {
                 securityRecovery.remove(loginRequest.password)
                 user.securityRecovery = objectMapper.writeValueAsString(securityRecovery)
             }
-            return CommonResponse(
-                data = JwtResponse(
-                    jwtUtil.createAccessToken(user.id.toString(), emptyList()),
-                )
+            return JwtResponse(
+                jwtUtil.createAccessToken(user.id.toString(), emptyList()),
             )
         } else {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
@@ -132,13 +121,11 @@ class AccountAuthService(
      * @return A `CommonResponse` containing the generated OTP URI associated with the user's OTP secret.
      */
     @Transactional
-    fun requestOtpRegister(): CommonResponse<String> {
+    fun requestOtpRegister(): String {
         val user = accountUtil.getUserOrThrow()
         user.otpEnabled = false
         user.otpSecret = generator.generateBase32RandomChallengeToken(8)
-        return CommonResponse(
-            data = otpService.generateOtpUri(user.otpSecret!!.toByteArray(), user.username)
-        )
+        return otpService.generateOtpUri(user.otpSecret!!.toByteArray(), user.username)
     }
 
     /**
@@ -154,13 +141,13 @@ class AccountAuthService(
      * @throws ResponseStatusException If the provided OTP is invalid.
      */
     @Transactional
-    fun otpRegistrationVerify(otpCode: String): CommonResponse<List<String>> {
+    fun otpRegistrationVerify(otpCode: String): List<String> {
         val user = accountUtil.getUserOrThrow()
         if (otpService.validate(user.otpSecret!!.toByteArray(), otpCode)) {
             user.otpEnabled = true
             val securityRecovery = List(8) { generator.generateBase32RandomChallengeToken(8) }
             user.securityRecovery = ObjectMapper().writeValueAsString(securityRecovery)
-            return CommonResponse(data = securityRecovery)
+            return securityRecovery
         } else {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP is not valid")
         }
@@ -177,12 +164,12 @@ class AccountAuthService(
      * @throws ResponseStatusException If the provided security recovery token is invalid.
      */
     @Transactional
-    fun disableOtp(securityRecoveryToken: String): CommonResponse<String> {
+    fun disableOtp(securityRecoveryToken: String): String {
         val user = accountUtil.getUserOrThrow()
         val securityRecovery = ObjectMapper().readValue(user.securityRecovery, List::class.java)
-        if(!securityRecovery.contains(securityRecoveryToken)) {
+        if (!securityRecovery.contains(securityRecoveryToken)) {
             user.otpEnabled = false
-            return CommonResponse(data = "OK")
+            return "OK"
         } else {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid security recovery token")
         }
@@ -197,10 +184,10 @@ class AccountAuthService(
      * @return A response object containing the list of newly generated security recovery tokens.
      */
     @Transactional
-    fun regenerateSecurityRecovery(): CommonResponse<List<String>> {
+    fun regenerateSecurityRecovery(): List<String> {
         val user = accountUtil.getUserOrThrow()
         val securityRecovery = List(8) { generator.generateBase32RandomChallengeToken(8) }
         user.securityRecovery = ObjectMapper().writeValueAsString(securityRecovery)
-        return CommonResponse(data = securityRecovery)
+        return securityRecovery
     }
 }

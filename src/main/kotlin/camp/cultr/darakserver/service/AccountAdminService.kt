@@ -2,7 +2,6 @@ package camp.cultr.darakserver.service
 
 import camp.cultr.darakserver.domain.Account
 import camp.cultr.darakserver.domain.AccountGroupMember
-import camp.cultr.darakserver.dto.CommonResponse
 import camp.cultr.darakserver.dto.RegisterRequest
 import camp.cultr.darakserver.repository.AccountGroupMemberRepository
 import camp.cultr.darakserver.repository.AccountGroupRepository
@@ -22,7 +21,6 @@ class AccountAdminService(
     private val passwordEncoder: PasswordEncoder,
 ) {
 
-
     /**
      * Registers a new user by creating an account and associating it with a default group.
      *
@@ -33,7 +31,7 @@ class AccountAdminService(
      * @throws ResponseStatusException if the specified group is not found.
      */
     @Transactional
-    fun registerUser(req: RegisterRequest): CommonResponse<String> {
+    fun registerUser(req: RegisterRequest): String {
         val group = accountGroupRepository.findById(req.defaultGroupId).getOrNull()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found")
         val user = accountRepository.saveAndFlush(
@@ -50,6 +48,6 @@ class AccountAdminService(
                 group = group
             )
         )
-        return CommonResponse(data = "success")
+        return "success"
     }
 }
