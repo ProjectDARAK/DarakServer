@@ -3,7 +3,7 @@ plugins {
     kotlin("plugin.spring") version "1.9.25"
     id("org.springframework.boot") version "3.5.4"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.hibernate.orm") version "6.6.22.Final"
+    id("org.hibernate.orm") version "7.1.0.Final"
     id("org.graalvm.buildtools.native") version "0.10.6"
     kotlin("plugin.jpa") version "1.9.25"
 }
