@@ -8,7 +8,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     id("org.hibernate.orm") version "6.6.22.Final"
     id("org.graalvm.buildtools.native") version "0.10.6"
-    kotlin("plugin.jpa") version "1.9.25"
+    kotlin("plugin.jpa") version "2.2.10"
     // Disable Sentry for now
 //    id("io.sentry.jvm.gradle") version "5.9.0"
 }
