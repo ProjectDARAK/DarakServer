@@ -2,6 +2,10 @@
 
 Darak (Korean: "다락", meaning attic/loft) is a SOHO/personal NAS solution. This repository contains the backend API server built with Spring Boot and Kotlin, designed to power the Darak ecosystem, including a Flutter-based client.
 
+### Issue Tracker
+- [GitHub Issues](https://github.com/ProjectDARAK/DarakDocumentation/issues)
+- [Security vulnerability report](https://github.com/ProjectDARAK/DarakServer/security)
+
 ## Repository Scope
 - This repo: Backend REST API server
 - Tech stack: Spring Boot 3 (Kotlin), Spring Security, Spring Data JPA, PostgreSQL, Gradle, optional GraalVM native image
